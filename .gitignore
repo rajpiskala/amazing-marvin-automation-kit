@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+.DS_Store
+Thumbs.db
+
+# Local reference material: downloaded Marvin page, cloned API wiki,
+# cloned automation repo, and cloned browser-extension repo.
+references/*
+!references/README.md
