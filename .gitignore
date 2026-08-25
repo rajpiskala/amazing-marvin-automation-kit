@@ -15,3 +15,10 @@ Thumbs.db
 # cloned automation repo, and cloned browser-extension repo.
 references/*
 !references/README.md
+
+# Local browser captures and task-analysis exports can contain private Marvin data.
+/Amazing Marvin - Daily Tasks.htm
+/Amazing Marvin - Daily Tasks_files/
+/task_details*.csv
+/task_processed.csv
+/task_search_view.png

@@ -47,12 +47,12 @@ This script makes it faster to finish a task that has a lot of subtasks. Instead
 
 ### What it solves
 
-This script expands a single Marvin task into a short sequence of tasks when you write loop syntax in the title. It is useful for repeated work that you want Marvin to create automatically, while preserving the task's metadata.
+This script expands a single Marvin task into a short sequence of tasks when you add a natural counter to the title. It is useful for repeated work that you want Marvin to create automatically, while preserving the task's metadata.
 
 Example inputs:
 
-- `Do Assignment #$1..3`
-- `8:00am Watch documentary on wildlife ($1..3)`
+- `8:00am Watch documentary on wildlife (1/3)`
+- `8:00am Do first lecture block (1/5)`
 
 ### How to use it
 
@@ -69,22 +69,20 @@ Example inputs:
 
 ### Loop syntax
 
-- `$1..3` becomes a numbered sequence.
-- `#` can be part of the title, so `Do Assignment #$1..3` becomes:
-  - `Do Assignment #1`
-  - `Do Assignment #2`
-  - `Do Assignment #3`
-- Parenthesized loops keep the counter and total, so `($1..3)` becomes `(1/3)`, `(2/3)`, `(3/3)`.
-- If the task has a start time in the title or Marvin stores one separately, a duration is required so later copies can shift forward correctly.
-- If there is no start time, the loop can still expand without a duration.
+- `(1/3)` becomes `(1/3)`, `(2/3)`, `(3/3)`.
+- `(1/5)` becomes five tasks, numbered `(1/5)` through `(5/5)`.
+- Natural counter syntax requires both a scheduled day and a start time, so the script only expands tasks that Marvin has actually placed on a date and time.
+- A duration is required so later copies can shift forward correctly.
+- The older `$1..3` syntax is still supported for compatibility.
 
 ### Step-by-step example: basic numbering
 
-1. In Marvin, create a task named `Do Assignment #$1..3`.
+1. In Marvin, create a scheduled task named `8:00am Do Assignment (1/3)`.
 2. Save the task normally.
-3. The script sees the new task, reads the saved Marvin task object, and renames the original to `Do Assignment #1`.
-4. It creates two more tasks through Marvin's API: `Do Assignment #2` and `Do Assignment #3`.
-5. Marvin should briefly show a toast saying it is unrolling the task, then another toast confirming the copies were created.
+3. The script sees the new task, reads the saved Marvin task object, and confirms that it has a day and start time.
+4. It keeps the original as `8:00am Do Assignment (1/3)`.
+5. It creates two more tasks through Marvin's API: `8:20am Do Assignment (2/3)` and `8:40am Do Assignment (3/3)`, assuming a 20-minute duration.
+6. Marvin should briefly show a toast saying it is unrolling the task, then another toast confirming the copies were created.
 
 ### What you should see
 
@@ -95,7 +93,7 @@ Example inputs:
 
 ### Step-by-step example: timed unrolling
 
-1. Create a task like `8:00am Watch documentary on wildlife ($1..3)`.
+1. Create a task like `8:00am Watch documentary on wildlife (1/3)`.
 2. Give the task a duration of 20 minutes.
 3. Save the task.
 4. The script renames the original to the first iteration.

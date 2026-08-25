@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Amazing Marvin - Task Unroller
 // @namespace    https://app.amazingmarvin.com/
-// @version      0.5.0
-// @description  Expands a just-created Marvin task like "8:00am Read 20m ($1..3)" or "Do Assignment #$1..3".
+// @version      0.6.0
+// @description  Expands a just-created Marvin task like "8:00am Read 20m (1/3)" when it has a scheduled day and start time.
 // @author       Raj Piskala
 // @match        https://app.amazingmarvin.com/*
 // @match        https://amazingmarvin.com/*
@@ -25,7 +25,9 @@
     fullAccessToken: "amTaskUnroller.fullAccessToken",
   };
 
-  const LOOP_PATTERN = /\$(\d+)\s*\.\.\s*(\d+)/;
+  const RANGE_LOOP_PATTERN = /\$(\d+)\s*\.\.\s*(\d+)/;
+  const NATURAL_LOOP_PATTERN = /\(\s*1\s*\/\s*(\d+)\s*\)/;
+  const LOOP_CANDIDATE_PATTERN = new RegExp(`${RANGE_LOOP_PATTERN.source}|${NATURAL_LOOP_PATTERN.source}`);
   const TASK_SELECTOR = '[data-item-type="task"]';
   const TITLE_SELECTOR = ".TitlePart";
   const API_DELAY_MS = 1100;
@@ -394,7 +396,7 @@
     return `${time.padHour ? String(hour).padStart(2, "0") : String(hour)}:${String(minute).padStart(2, "0")}`;
   }
 
-  function getLoopMarker(text, loopMatch) {
+  function getRangeLoopMarker(text, loopMatch) {
     let startIndex = loopMatch.index;
     let endIndex = loopMatch.index + loopMatch[0].length;
     let parenthesized = false;
@@ -415,6 +417,45 @@
     };
   }
 
+  function getNaturalLoopMarker(loopMatch) {
+    return {
+      startIndex: loopMatch.index,
+      endIndex: loopMatch.index + loopMatch[0].length,
+      parenthesized: true,
+      counterWidth: 1,
+    };
+  }
+
+  function parseRangeLoop(rawText) {
+    const loopMatch = rawText.match(RANGE_LOOP_PATTERN);
+    if (!loopMatch) return null;
+
+    const start = Number(loopMatch[1]);
+    const end = Number(loopMatch[2]);
+    if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) return null;
+
+    return {
+      start,
+      end,
+      marker: getRangeLoopMarker(rawText, loopMatch),
+    };
+  }
+
+  function parseNaturalLoop(rawText, doc, time) {
+    const loopMatch = rawText.match(NATURAL_LOOP_PATTERN);
+    if (!loopMatch) return null;
+
+    const end = Number(loopMatch[1]);
+    if (!Number.isInteger(end) || end < 2) return null;
+    if (!doc?.day || !time) return null;
+
+    return {
+      start: 1,
+      end,
+      marker: getNaturalLoopMarker(loopMatch),
+    };
+  }
+
   function replaceLoopMarker(text, loop, counter) {
     const counterText = String(counter).padStart(loop.marker.counterWidth, "0");
     const replacement = loop.marker.parenthesized ? `(${counterText}/${loop.end})` : counterText;
@@ -430,25 +471,21 @@
 
   function parseLoop(text, doc) {
     const rawText = String(text || "");
-    const loopMatch = rawText.match(LOOP_PATTERN);
-    if (!loopMatch) return null;
-
-    const start = Number(loopMatch[1]);
-    const end = Number(loopMatch[2]);
-    if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) return null;
+    const time = parseTitleTime(rawText) || parseStoredTaskTime(doc?.taskTime);
+    const parsedLoop = parseRangeLoop(rawText) || parseNaturalLoop(rawText, doc, time);
+    if (!parsedLoop) return null;
 
     const durationMillis = doc?.timeEstimate || parseDurationMillis(rawText);
-    const time = parseTitleTime(rawText) || parseStoredTaskTime(doc?.taskTime);
     if (time && !durationMillis) {
       throw new Error("Looped timed tasks need a duration so later start times can be calculated.");
     }
 
     return {
-      start,
-      end,
+      start: parsedLoop.start,
+      end: parsedLoop.end,
       rawText,
       durationMillis: durationMillis || null,
-      marker: getLoopMarker(rawText, loopMatch),
+      marker: parsedLoop.marker,
       time,
     };
   }
@@ -531,7 +568,7 @@
     if (!taskId || processedTaskIds.has(taskId)) return;
 
     const title = taskTitleFromElement(taskElement);
-    if (!LOOP_PATTERN.test(title)) return;
+    if (!LOOP_CANDIDATE_PATTERN.test(title)) return;
 
     processedTaskIds.add(taskId);
     unrollTask(taskId, title).catch((error) => {
